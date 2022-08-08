@@ -79,22 +79,6 @@ do
     esac
 done
 
-###################################
-# VALIDATE INPUT
-###################################
-if [[ -z "${GVMVERSION}" ]]
-then
-  printf "you must provide a version number to install\n"
-  print_help
-fi
-
-if [[ $GVMVERSION = "21" ]] || [[ $GVMVERSION = "20" ]]; then
-    echo "Okay, installing version $GVMVERSION"
-else 
-    echo "Sorry, I didn't understand the input $GVMVERSION."
-    echo "Please re-run install_gvm.sh and enter a version number at the prompt"
-    exit 1
-fi
 
 apt-get update
 apt-get upgrade -y 
@@ -154,18 +138,6 @@ echo "/opt/gvm/lib" > /etc/ld.so.conf.d/gvm.conf
 sudo -Hiu gvm mkdir /tmp/gvm-source
 cd /tmp/gvm-source
 
-if [ $GVMVERSION = "20" ]; then
-    sudo -Hiu gvm git clone -b v20.8.1 https://github.com/greenbone/gvm-libs.git
-    sudo -Hiu gvm git clone https://github.com/greenbone/openvas-smb.git
-    sudo -Hiu gvm git clone -b v20.8.1 https://github.com/greenbone/openvas.git
-    sudo -Hiu gvm git clone -b v20.8.1 https://github.com/greenbone/ospd.git
-    sudo -Hiu gvm git clone -b v20.8.1 https://github.com/greenbone/ospd-openvas.git
-    sudo -Hiu gvm git clone -b v20.8.1 https://github.com/greenbone/gvmd.git
-    sudo -Hiu gvm git clone -b v20.8.1 https://github.com/greenbone/gsa.git
-    sudo -Hiu gvm git clone https://github.com/greenbone/python-gvm.git
-    sudo -Hiu gvm git clone https://github.com/greenbone/gvm-tools.git
-elif [ $GVMVERSION = "21" ]; then
-
     export GVM_VERSION=21.4.4
     export GVM_LIBS_VERSION=$GVM_VERSION
     export GVMD_VERSION=21.4.5
@@ -197,14 +169,6 @@ elif [ $GVMVERSION = "21" ]; then
 fi
 
 sudo -Hiu gvm cp --recursive /opt/gvm/* /tmp/gvm-source/
-
-
-# Kali linux 2020.4 puts a message about python2 in that's causing problems below. This should workaround.
-if [[ $ID = "debian" ]] || [[ $ID = "kali" ]]; then
-    touch /opt/gvm/.hushlogin
-    chown gvm:gvm /opt/gvm/.hushlogin
-    touch /root/.hushlogin
-fi
 
 # TODO should refactor this to write out a script for the gvm user to execute like the ones later in 
 # this script leaving .bashrc alone. I initially used .bashrc just because it was automatically
@@ -270,21 +234,8 @@ systemctl start redis-server@openvas
 systemctl enable redis-server@openvas
 echo "gvm ALL = NOPASSWD: /opt/gvm/sbin/openvas" > /etc/sudoers.d/gvm
 # This next line varies between Debian and Ubuntu because it includes /snap/bin on Ubuntu                                                                                                    
-ID=`grep ^ID= /etc/os-release | sed 's/ID=//g'`
-if [[ $ID = "debian" ]] || [[ $ID = "kali" ]]; then
-    sed 's/Defaults\s.*secure_path=\"\/usr\/local\/sbin:\/usr\/local\/bin:\/usr\/sbin:\/usr\/bin:\/sbin:\/bin"/Defaults secure_path=\"\/usr\/local\/sbin:\/usr\/local\/bin:\/usr\/sbin:\/usr\/bin:\/sbin:\/bin:\/opt\/gvm\/sbin\:\/opt\/gvm\/bin"/g' /etc/sudoers | EDITOR='tee' visudo
-    
-    # when adapting this script for Debian I found that there's an issue later on when the gvm user
-    # tries to run greenbone-nvt-sync. The thing tries to write to /dev/stderr and receives a permission denied message
-    # The code below works around the problem by adding the gvm user to the tty group and setting the permissons for group
-    # read/write on the target of the /dev/stderr symlink (if you're /dev/stderr doesn't point to /dev/pts/2 you may need
-    # to adjust the chmod command below.
-    # more info at https://unix.stackexchange.com/questions/38538/bash-dev-stderr-permission-denied
-    usermod -aG tty gvm
-    #chmod g+rw /dev/pts/2 # This doesn't work consistantely 
-else
-    sed 's/Defaults\s.*secure_path=\"\/usr\/local\/sbin:\/usr\/local\/bin:\/usr\/sbin:\/usr\/bin:\/sbin:\/bin:\/snap\/bin\"/Defaults secure_path=\"\/usr\/local\/sbin:\/usr\/local\/bin:\/usr\/sbin:\/usr\/bin:\/sbin:\/bin:\/snap\/bin:\/opt\/gvm\/sbin:\/opt\/gvm\/bin"/g' /etc/sudoers | EDITOR='tee' visudo
-fi
+sed 's/Defaults\s.*secure_path=\"\/usr\/local\/sbin:\/usr\/local\/bin:\/usr\/sbin:\/usr\/bin:\/sbin:\/bin:\/snap\/bin\"/Defaults secure_path=\"\/usr\/local\/sbin:\/usr\/local\/bin:\/usr\/sbin:\/usr\/bin:\/sbin:\/bin:\/snap\/bin:\/opt\/gvm\/sbin:\/opt\/gvm\/bin"/g' /etc/sudoers | EDITOR='tee' visudo
+
 
 echo "gvm ALL = NOPASSWD: /opt/gvm/sbin/gsad" >> /etc/sudoers.d/gvm
 # Build and Install Greenbone Secuirty Assistant
@@ -436,14 +387,6 @@ sudo -Hiu gvm echo "export PYTHONPATH=/opt/gvm/lib/python$PY3VER/site-packages" 
 #############################################################
 sudo -Hiu gvm echo "/usr/bin/python3 /opt/gvm/bin/ospd-openvas --pid-file /opt/gvm/var/run/ospd-openvas.pid --log-file /opt/gvm/var/log/gvm/ospd-openvas.log --lock-file-dir /opt/gvm/var/run -u /opt/gvm/var/run/ospd.sock" | sudo -Hiu gvm tee -a /opt/gvm/start.sh
 
-ID=`grep ^ID= /etc/os-release | sed 's/ID=//g'`
-if [[ $ID = "debian" ]]; then
-    sudo -Hiu gvm echo "echo \"Trying again\"" | sudo -Hiu gvm tee -a /opt/gvm/start.sh
-    sudo -Hiu gvm echo "sleep 10" | sudo -Hiu gvm tee -a /opt/gvm/start.sh
-    sudo -Hiu gvm echo "echo \"Should be good now\"" | sudo -Hiu gvm tee -a /opt/gvm/start.sh
-    sudo -Hiu gvm echo "/usr/bin/python3 /opt/gvm/bin/ospd-openvas --pid-file /opt/gvm/var/run/ospd-openvas.pid --log-file /opt/gvm/var/log/gvm/ospd-openvas.log --lock-file-dir /opt/gvm/var/run -u /opt/gvm/var/run/ospd.sock" | sudo -Hiu gvm tee -a /opt/gvm/start.sh
-    sudo -Hiu gvm echo "echo Continuing" | sudo -Hiu gvm tee -a /opt/gvm/start.sh
-fi
 
 # Start GVM
 sudo -Hiu gvm echo "/opt/gvm/sbin/gvmd --osp-vt-update=/opt/gvm/var/run/ospd.sock" | sudo -Hiu gvm tee -a /opt/gvm/start.sh
@@ -636,7 +579,7 @@ sleep 300
 echo "The installation is done, but there may still be an update in progress."
 echo "Please be patient if you aren't able to log in at first."
 echo "You may also need to restart"
-if [ $GVMVERSION = "20" ] || [ $GVMVERSION = "21" ]; then
+
     echo ""
     echo "If you're unable to log in to the web interface try restarting"
     echo "and running all of the update commands in the gvm user's crontab"
@@ -644,7 +587,7 @@ if [ $GVMVERSION = "20" ] || [ $GVMVERSION = "21" ]; then
     echo "and ensure they complete successfully. Alternatively, leave the machine running"
     echo "for 24 hours and let cron handle it."
     echo ""
-fi
+
 echo "Username is gvmadmin and pasword is StrongPass"
 echo "Remember to change this default password"
 echo "sudo -Hiu gvm gvmd --user=gvmadmin --new-password=<PASSWORD>"
