@@ -11,7 +11,6 @@
 #
 # Licensed under GPLv3 or later
 ######################################################################
-
 ###################################
 # SET SOME VARS INITIAL VALUES
 ###################################
@@ -19,7 +18,6 @@ UFW=false
 API=false
 gvm_home_dir="$cat /etc/passwd | grep gvm | cut -f6 -d:"
 gvm_shell="$cat /etc/passwd | grep gvm | cut -f7 -d:"
-
 ###################################
 # SCRIPT FUNCTIONS
 ###################################
@@ -35,17 +33,6 @@ print_help () {
 
     exit 1
 }
-
-
-###################################
-# Being root is mandatory
-###################################
-if [ "$EUID" -ne 0 ]
-  then echo "Please run as root"
-  exit
-fi
-
-
 ###################################
 # HANDLE CLI PARAMETERS
 ###################################
@@ -78,8 +65,6 @@ do
         ;;
     esac
 done
-
-
 apt-get update
 apt-get upgrade -y 
 useradd -r -d /opt/gvm -c "GVM (OpenVAS) User" -s /bin/bash gvm
@@ -123,16 +108,6 @@ sudo -Hiu postgres psql -c 'create extension "pgcrypto";' gvmd
 systemctl restart postgresql
 systemctl enable postgresql
 
-# Taking the below out. If anyone wants to make another attempt to get this working on Kali
-# feel free.
-# Kali Linux uses postgresql 13 which cmake doesn't know about as of version 3.18 so it get's added here
-# should have no effect on Debian stable as the line starts with "11" rather than "12" so it won't be matched.
-# It throws an error but it's not critical.
-ID=`grep ^ID= /etc/os-release | sed 's/ID=//g'`
-#if [[ $ID = "kali" ]]; then
-#    sed -i 's/"12" "11" "10"/"13" "12" "11" "10"/g' /usr/share/cmake-3.18/Modules/FindPostgreSQL.cmake
-#fi
-
 sed -i 's/\"$/\:\/opt\/gvm\/bin\:\/opt\/gvm\/sbin\:\/opt\/gvm\/\.local\/bin\"/g' /etc/environment
 echo "/opt/gvm/lib" > /etc/ld.so.conf.d/gvm.conf
 sudo -Hiu gvm mkdir /tmp/gvm-source
@@ -166,7 +141,7 @@ cd /tmp/gvm-source
     sudo -Hiu gvm curl -f -L https://github.com/greenbone/ospd-openvas/archive/refs/tags/v$OSPD_OPENVAS_VERSION.tar.gz -o ospd-openvas-$OSPD_OPENVAS_VERSION.tar.gz
     sudo -Hiu gvm tar zxvf ospd-openvas-$OSPD_OPENVAS_VERSION.tar.gz
 
-fi
+
 
 sudo -Hiu gvm cp --recursive /opt/gvm/* /tmp/gvm-source/
 
